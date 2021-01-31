@@ -8,31 +8,37 @@
 Adafruit_SSD1306 display(OLED_RESET);
 
 String output;
+boolean menu_is_active = false;
+byte menu_item_counter = 0;
+int menu_item_value = 0;
+
+// Параментри пунктів меню в вигляді масивів
+const char *output_unit[] = {"dBm", "microWatt"};
+const char *output_mode[] = {"Average", "Min", "Max"};
+const char *frequency[] = {"80 MHz", "400 MHz", "900 MHz", "1.5 GHz", "2.4 GHz", "3.6 GHz", "6 GHz", "8 GHz"};
+const char *attenuation[] = {"Att: 0 dB", "Att: 10 dB", "Att: 20 dB", "Att: 30 dB"};
 
 // Меню
 
-boolean menu_is_active = false;
-byte menu_items_counter = 0;
-const char *output_mode[] = {"dBm", "microWatt"};
-const char *frequency[] = {"80 MHz", "400 MHz", "900 MHz", "1.5 GHz", "2.4 GHz", "3.6 GHz", "6 GHz", "8 GHz"};
-const char *attenuation[] = {"10 dB", "20 dB", "30 dB"};
-
-String menu(boolean change_menu_item) {
-  if (!change_menu_item) {
-    menu_items_counter++;
-    if (menu_items_counter == 4) {
-      menu_items_counter = 0;
+String menu(boolean menu_item_change, int menu_item_value) {
+  if (!menu_item_change) {
+    menu_item_counter++;
+    if (menu_item_counter == 5) {
+      menu_item_counter = 0;
     }
   }
-  if (menu_items_counter == 0) {
-    return ("dBm");
-  } else if (menu_items_counter == 1) {
-    return ("80 MHz");
-  } else if (menu_items_counter == 2) {
-    return ("Att.: 0 dB");
-  } else if (menu_items_counter == 3) {
-    return ("Calib.");
-  }
+
+  // Обмеження максимального значення параметра в пункті меню
+  if (menu_item_counter == 0 and menu_item_value > 1) menu_item_value = 1;
+  else if (menu_item_counter == 1 and menu_item_value > 2) menu_item_value = 2;
+  else if (menu_item_counter == 2 and menu_item_value > 7) menu_item_value = 7;
+  else if (menu_item_counter == 3 and menu_item_value > 3) menu_item_value = 3;
+ 
+  if (menu_item_counter == 0) return output_unit[menu_item_value];
+  else if (menu_item_counter == 1) return output_mode[menu_item_value];
+  else if (menu_item_counter == 2) return frequency[menu_item_value];
+  else if (menu_item_counter == 3) return attenuation[menu_item_value];
+  else if (menu_item_counter == 4) return "Calib.";
 }
 
 // Вимір вхідного сигналу
@@ -82,12 +88,13 @@ void setup()
 
 void loop()
 {
-  boolean start_stop_menu = digitalRead(2); // Натискання на кнопку Btn1 включає і виключає меню
-  boolean change_menu_item = digitalRead(3); // Натискання на кнопку Btn2 послідовно переключає пункти меню
-  boolean menu_item_value_up = digitalRead(4); // Натискання на кнопку Btn3 збільшує параментр в пункті меню
-  boolean menu_item_value_down = digitalRead(5); // Натискання на кнопку Btn4 зменьшує параментр в пункті меню
+  boolean menu_on_off = digitalRead(2); // Натискання на кнопку Btn1 включає і виключає меню
+  boolean menu_item_change = digitalRead(3); // Натискання на кнопку Btn2 послідовно переключає пункти меню
+  boolean menu_item_value_up = digitalRead(4); // Натискання на кнопку Btn3 збільшує параметр в пункті меню
+  boolean menu_item_value_down = digitalRead(5); // Натискання на кнопку Btn4 зменьшує параметр в пункті меню
 
-  if (!start_stop_menu) {
+  // Фіксація стану меню (включено, виключено)
+  if (!menu_on_off) {
     if (!menu_is_active) {
       menu_is_active = true;
     } else {
@@ -95,8 +102,19 @@ void loop()
     }
   }
 
+  // Скидання параметрів пунктів меню на 0 при перемиканні пунктів меню
+  if (!menu_item_change) menu_item_value = 0;
+
+  // Фіксація значення параметра в пункті меню
+  if (!menu_item_value_up) menu_item_value++;
+  if (!menu_item_value_down) {
+    menu_item_value--;
+    if (menu_item_value < 0) menu_item_value = 0;
+  }
+
+  //Виведення на екран меню або результатів виміру
   if (menu_is_active) {
-    output = menu(change_menu_item);
+    output = menu(menu_item_change, menu_item_value);
   } else {
     output = measurement();
   }
